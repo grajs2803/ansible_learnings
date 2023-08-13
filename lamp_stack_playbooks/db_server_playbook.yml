@@ -1,0 +1,32 @@
+---
+- hosts: db_servers
+  name: Installing and configuring a DB SERVERS
+  become: true
+  become_method: sudo 
+  tasks:
+   - name: Install mariaDB and MySQL-python
+     yum:
+      name: "{{ item }}"
+      state: installed
+     with_items:
+      - mariadb-server
+      - MySQL-python
+   
+   - name: Copying the conf 
+     copy:
+      src: "files/my.cnf"
+      dest: "/etc/my.cnf"
+
+   - name: starting a and enabling mariadb 
+     service:
+      name: mariadb
+      state: started
+      enabled: true
+
+   - name: configuring firewall
+     firewalld:
+      port: "3306/tcp"
+      zone: "public"
+      state: enabled
+      immediate: true
+      permanent: true

@@ -1,0 +1,10 @@
+---
+- name: print_dns server
+  hosts: all
+  tasks:
+    - shell: "echo {{hostvars['node01.host'].dns_server}} >> /tmp/variable.txt" # magic variable populated by ansible hostvars
+
+- hosts: node00.host
+  gather_facts: yes
+  tasks:
+  - shell: "echo  {{inventory_hostname}} {{ ansible_default_ipv4.address }} >> /etc/hosts"

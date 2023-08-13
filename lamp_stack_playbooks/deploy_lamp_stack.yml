@@ -1,0 +1,117 @@
+# DEPLOY A LAMP STACK APP
+---
+- name: Deploy lamp stack application
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Install common dependencies
+      yum:
+        name:
+          - libselinux-python
+          - libsemanage-python
+          - firewalld
+        state: installed
+
+- hosts: db_servers
+  name: Installing and configuring a DB SERVERS
+  become: true
+  become_method: sudo 
+  tasks:
+   - name: Install mariaDB and MySQL-python
+     yum:
+      name: "{{ item }}"
+      state: installed
+     with_items:
+      - mariadb-server
+      - MySQL-python
+   
+   - name: Copying the conf 
+     copy:
+      src: "files/my.cnf"
+      dest: "/etc/my.cnf"
+
+   - name: starting a and enabling mariadb 
+     service:
+      name: mariadb
+      state: started
+      enabled: true
+
+   - name: starting a and enabling firewalld
+     service:
+      name: firewalld
+      state: started
+      enabled: true
+
+   - name:
+     firewalld:
+      port: "{{ mysql_port }}/tcp"
+      zone: "public"
+      state: enabled
+      immediate: true
+      permanent: true
+
+   - name: creating a db 
+     mysql_db:
+       name: "{{ dbname }}"
+       state: present
+
+   - name: Create Application DB User
+     mysql_user: name={{ dbuser }} password={{ dbpassword }} priv=*.*:ALL host={{ ansible_host }} state=present
+   
+   - copy:
+       src: db-load-script.sql
+       dest: /tmp
+   
+   - name: Loading inventory Data
+     shell: |
+               mysql -f < /tmp/db-load-script.sql
+       
+      
+- hosts: web_servers
+  become : true
+  become_method: sudo 
+  name: Installing web_servers
+  tasks:
+
+    - name: Install prerequisites
+      yum: 
+       name: "{{ item }}"
+       state: present
+      with_items:
+        - httpd
+        - php
+        - git
+        - php-mysql
+
+    - name: Start and enable firewalld
+      service:
+       name: firewalld
+       state: started
+       enabled: true
+
+    - name: Inserting firewal rules 
+      firewalld:
+       port: "{{ httpd_port }}/tcp"
+       state: enabled
+       immediate: true
+       permanent: true
+   
+    - name: "set index.php"
+      replace:
+       path: /etc/httpd/conf/httpd.conf
+       replace: "DirectoryIndex index.html"
+       regexp: "DirectoryIndex index.php"
+      
+    - name: start and enable httpd
+      service:
+       name: httpd
+       state:  started
+       enabled: true
+    
+    - name: Copy the code from repository
+      git: repo={{ repository }} dest=/var/www/html/  force=yes
+
+    - name: Creates the index.php file
+      copy: src=files/index.php dest=/var/www/html/index.php
+      
